@@ -23,7 +23,8 @@ AStillworldWeather::AStillworldWeather()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	auto MakeLayer = [this, &Cylinder](const TCHAR* Name, const FVector& Scale)
+	// (A static local needs no capture.)
+	auto MakeLayer = [this](const TCHAR* Name, const FVector& Scale)
 	{
 		UStaticMeshComponent* M = CreateDefaultSubobject<UStaticMeshComponent>(Name);
 		M->SetupAttachment(RootComponent);

@@ -14,10 +14,13 @@ infinie à partir d'une seed aléatoire :
 
 > ⚠️ **État actuel, honnêtement :** le code C++ et les scripts d'éditeur n'ont
 > **pas pu être compilés ni lancés** dans l'environnement où ils ont été écrits
-> (pas d'Unreal Engine ni de GPU disponibles). Ils ont été relus attentivement,
-> mais attends-toi à quelques erreurs de compilation à corriger au premier build
-> — envoie-moi le log, je corrige. Aucune mesure de performance n'existe encore :
-> utilise le mode benchmark (voir `docs/PERFORMANCE.md`).
+> (pas d'Unreal Engine ni de GPU disponibles). Ils ont été relus en détail par
+> trois passes indépendantes contre l'API réelle d'UE 5.5/5.6 (sept erreurs de
+> compilation et un bug bloquant du script de matériaux ont été corrigés), mais
+> un premier build réserve toujours des surprises : envoie-moi le log, je
+> corrige. Aucune mesure de performance n'existe encore (voir
+> `docs/PERFORMANCE.md`). Le photoréalisme final dépend des assets
+> Megascans/Fab à ajouter localement (`docs/ASSETS.md`).
 
 ## Structure
 

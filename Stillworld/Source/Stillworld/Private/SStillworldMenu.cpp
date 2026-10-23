@@ -254,15 +254,17 @@ void SStillworldMenu::AddSlider(TSharedRef<SVerticalBox> Box, const FText& Label
 				.SliderBarColor(FLinearColor(1, 1, 1, 0.25f))
 				.SliderHandleColor(Accent)
 				.Value_Lambda([Get]() { return Get(); })
-				.OnValueChanged_Lambda([this, Set, bInteger, bCommitOnRelease](float V)
+				.OnValueChanged_Lambda([Set, bInteger, bCommitOnRelease](float V)
 				{
 					Set(bInteger ? FMath::RoundToFloat(V) : V);
-					if (!bCommitOnRelease) { Commit(); }
+					// Light settings (FOV, volumes...) take effect live through
+					// OnChanged; heavy ones (resolution, density) wait for release.
+					if (!bCommitOnRelease) { FStillworldSettings::OnChanged.Broadcast(); }
 				})
-				.OnMouseCaptureEnd_Lambda([this, bCommitOnRelease]()
+				.OnMouseCaptureEnd_Lambda([this]()
 				{
-					// Resolution / density changes are applied once, on release.
-					if (bCommitOnRelease) { Commit(); }
+					// Engine apply + save to disk once, on release.
+					Commit();
 				})
 			]
 		]

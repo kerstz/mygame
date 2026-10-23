@@ -12,6 +12,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "DynamicRHI.h"
 #include "RHI.h"
 #include "SStillworldMenu.h"
 #include "StillworldGameMode.h"
@@ -100,8 +101,7 @@ void AStillworldPlayerController::BeginPlay()
 	FString PresetArg;
 	if (FParse::Value(FCommandLine::Get(), TEXT("preset="), PresetArg))
 	{
-		for (EStillworldPreset P : { EStillworldPreset::Performance, EStillworldPreset::High,
-			EStillworldPreset::Ultra, EStillworldPreset::Cinematic })
+		for (EStillworldPreset P : { EStillworldPreset::Performance, EStillworldPreset::High, EStillworldPreset::Ultra })
 		{
 			if (PresetArg.Equals(FStillworldSettings::PresetName(P), ESearchCase::IgnoreCase))
 			{
