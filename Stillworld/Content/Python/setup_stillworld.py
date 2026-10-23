@@ -398,10 +398,7 @@ def reset_material(path):
 
 
 def finish_material(mat, path):
-    try:
-        MEL.layout_material_expressions(mat)
-    except Exception:
-        pass
+    # Nodes are placed by hand above; the auto-layout is usually worse.
     MEL.recompile_material(mat)
     save(path)
 
@@ -492,8 +489,27 @@ def create_terrain_material():
     g = Graph(mat)
 
     world_uv = g.node(unreal.MaterialExpressionTextureCoordinate, -3000, 0, coordinate_index=0)  # metres
+    # VertexColor outputs are unnamed in UE (channel masks only), so split the
+    # channels once with ComponentMask nodes and reuse them everywhere.
     vc = g.node(unreal.MaterialExpressionVertexColor, -3000, 1600)
-    wet = g.collection(mpc, "Wetness", -3000, 1800)
+    vc_raw = {}
+    for i, ch in enumerate("RGBA"):
+        m = g.node(unreal.MaterialExpressionComponentMask, -2850, 1600 + i * 80,
+                   r=(ch == "R"), g=(ch == "G"), b=(ch == "B"), a=(ch == "A"))
+        g.link(vc, m)   # "" = first (RGBA) output
+        vc_raw[ch] = m
+    # Normalise the ground weights so R+G+B = 1 even if a vertex drifts (or a
+    # mesh without colours reads as white).
+    w_sum = g.add(g.add(vc_raw["R"], vc_raw["G"], -2700, 1600), vc_raw["B"], -2600, 1600)
+    w_max = g.node(unreal.MaterialExpressionMax, -2500, 1600, const_b=0.001)
+    g.link(w_sum, w_max, "A")
+    VC = {"A": vc_raw["A"]}
+    for i, ch in enumerate("RGB"):
+        d = g.node(unreal.MaterialExpressionDivide, -2400, 1600 + i * 80)
+        g.link(vc_raw[ch], d, "A")
+        g.link(w_max, d, "B")
+        VC[ch] = d
+    wet = g.collection(mpc, "Wetness", -3000, 1950)
 
     layers = {}
     y = -1600
@@ -535,10 +551,10 @@ def create_terrain_material():
     def blend3(key, x, yy):
         acc = None
         for name, ch in (("Grass", "R"), ("Dirt", "G"), ("Asphalt", "B")):
-            term = g.mul(layers[name][key], (vc, ch), x, yy)
+            term = g.mul(layers[name][key], VC[ch], x, yy)
             acc = term if acc is None else g.add(acc, term, x + 150, yy)
             yy += 120
-        return g.lerp(acc, layers["Moss"][key], (vc, "A"), x + 300, yy)   # moss on top
+        return g.lerp(acc, layers["Moss"][key], VC["A"], x + 300, yy)   # moss on top
 
     base = blend3("base", -1200, -400)
     normal = blend3("normal", -1200, 200)
@@ -564,8 +580,8 @@ def create_terrain_material():
     p_sat = g.node(unreal.MaterialExpressionSaturate, -700, 1750)
     g.link(g.mul(p_sub, None, -850, 1750, const_b=5.0), p_sat)
     no_moss = g.node(unreal.MaterialExpressionOneMinus, -850, 1900)
-    g.link((vc, "A"), no_moss)
-    puddle = g.mul(g.mul(g.mul(p_sat, (vc, "B"), -550, 1750), wet, -400, 1750), no_moss, -250, 1750)
+    g.link(VC["A"], no_moss)
+    puddle = g.mul(g.mul(g.mul(p_sat, VC["B"], -550, 1750), wet, -400, 1750), no_moss, -250, 1750)
 
     # Wetness: darken albedo, smooth roughness; puddles go further.
     wet_dark = g.lerp(None, None, wet, -550, -200, const_a=1.0, const_b=0.55)
