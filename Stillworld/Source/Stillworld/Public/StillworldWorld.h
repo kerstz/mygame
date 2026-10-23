@@ -104,7 +104,7 @@ private:
 
 	/** Keeps runtime-created components and loaded meshes alive for GC. */
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UObject>> KeepAlive;
+	TSet<TObjectPtr<UObject>> KeepAlive;
 
 	TMap<FIntPoint, FChunk> Chunks;
 	TArray<FPending> Pending;

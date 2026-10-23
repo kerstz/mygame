@@ -40,15 +40,24 @@ fougères (*fern*), lierre / buissons (*ivy*, *bush*), arbres. Textures :
    (`Content/Stillworld/Materials`) et remplace les paramètres `Grass_*`,
    `Dirt_*`, `Asphalt_*`, `Moss_*` (BaseColor, Normal, Roughness). Les textures
    de rugosité doivent être en *Compression = Masks*, sRGB désactivé.
-3. Note chaque asset utilisé dans `ASSET_LICENSES.md`.
+3. **Vent** : les matériaux Megascans de végétation ont leur propre vent
+   (paramètres *Wind* de l'instance de matériau) ; règle une amplitude faible
+   et désynchronisée (prairie : vagues lentes). Le jeu publie aussi sa force de
+   vent dans `MPC_Weather.WindStrength` si tu veux brancher ton propre
+   matériau de feuillage (`WindDirX/Y` pour la direction).
+4. Note chaque asset utilisé dans `ASSET_LICENSES.md`.
 
 Les assets Fab sont ignorés par git (licence non redistribuable dans un dépôt
 public).
 
 ## Sons réalistes
 
-Les 47 sons livrés sont des **placeholders synthétisés** (CC0). Pour un rendu
-réaliste, remplace-les par des enregistrements CC0 (Freesound filtré par
+Les 47 sons livrés sont des **placeholders synthétisés** (CC0) : ils donnent
+le comportement (pas selon la surface, couche mouillée, ambiances spatialisées,
+jamais deux fois le même échantillon) mais pas le réalisme d'un vrai
+enregistrement — l'environnement de développement n'avait pas accès à
+Internet pour en récupérer. Pour un rendu ultra-réaliste, remplace-les par des
+enregistrements CC0 (Freesound filtré par
 licence *Creative Commons 0*, ou les bundles libres de droits *Sonniss GDC*) :
 réimporte sur les **mêmes noms** (`/Game/Stillworld/Audio/SFX/Foot_Grass_01`,
 …), aucun changement de code n'est nécessaire. Le jeu charge automatiquement

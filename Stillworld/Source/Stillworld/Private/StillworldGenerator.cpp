@@ -1,14 +1,11 @@
 #include "StillworldGenerator.h"
 
 #include "Math/RandomStream.h"
+#include "StillworldMath.h"
 
 namespace
 {
-	float Smooth(float E0, float E1, float X)
-	{
-		const float T = FMath::Clamp((X - E0) / (E1 - E0), 0.f, 1.f);
-		return T * T * (3.f - 2.f * T);
-	}
+	using StillworldMath::SmoothStep;
 
 	float Perlin(const FVector2f& P)
 	{
@@ -86,6 +83,22 @@ float FStillworldGenerator::Patch(float X, float Y, float Scale, int32 Layer) co
 // ---------------------------------------------------------------------------
 // Heights
 
+// Wandering footpaths: thin bands where a low-frequency noise crosses zero.
+// Two independent fields give occasional crossings and forks.
+float FStillworldGenerator::Track(float X, float Y) const
+{
+	const FVector2f P(X, Y);
+	const float A = FMath::Abs(Fbm(P / 420.f, 2, 12));
+	const float B = FMath::Abs(Fbm(P / 610.f, 2, 13));
+	const float Edge = 0.012f + Fbm(P / 6.f, 2, 14) * 0.006f;   // ragged edges
+	float T = FMath::Max(SmoothStep(Edge + 0.01f, Edge - 0.004f, A), SmoothStep(Edge + 0.008f, Edge - 0.004f, B));
+	if (World == EStillworldWorld::Reclaimed)
+	{
+		T *= 1.f - Town(X, Y);
+	}
+	return T;
+}
+
 float FStillworldGenerator::MeadowHeight(FVector2f P) const
 {
 	// Domain warp: hills lose the "blobby" fBm look and get organic folds.
@@ -93,9 +106,10 @@ float FStillworldGenerator::MeadowHeight(FVector2f P) const
 	const float Large = Fbm(P / 2600.f, 4, 0) * 26.f;
 	const float Hills = Fbm((P + W * 140.f) / 650.f, 5, 3) * 17.f;
 	// Distant ridges give the fog something to swallow on the horizon.
-	const float Ridge = Ridged(P / 2200.f, 4, 4) * Smooth(0.15f, 0.55f, Fbm(P / 7000.f, 2, 5)) * 90.f;
+	const float Ridge = Ridged(P / 2200.f, 4, 4) * SmoothStep(0.15f, 0.55f, Fbm(P / 7000.f, 2, 5)) * 90.f;
 	const float Detail = Fbm(P / 55.f, 3, 6) * 0.9f + Fbm(P / 8.f, 2, 7) * 0.1f;
-	return Large + Hills + Ridge + Detail;
+	// Worn paths sit a few centimetres below the turf.
+	return Large + Hills + Ridge + Detail - Track(P.X, P.Y) * 0.12f;
 }
 
 float FStillworldGenerator::ReclaimedHeight(FVector2f P) const
@@ -134,7 +148,7 @@ float FStillworldGenerator::Town(float X, float Y) const
 		return 0.f;
 	}
 	// Large town regions separated by reclaimed forest.
-	return Smooth(-0.05f, 0.2f, Fbm(FVector2f(X, Y) / 2400.f, 3, 9));
+	return SmoothStep(-0.05f, 0.2f, Fbm(FVector2f(X, Y) / 2400.f, 3, 9));
 }
 
 FVector2f FStillworldGenerator::ToGrid(FVector2f P) const
@@ -168,7 +182,7 @@ float FStillworldGenerator::Road(float X, float Y) const
 	const float DV = FMath::Abs(G.Y - FMath::RoundToFloat(G.Y / BlockV) * BlockV);
 	const float D = FMath::Min(DU, DV);
 	// Roads fade out (are swallowed) toward the edge of town.
-	return Smooth(WalkHalf + 0.6f, WalkHalf - 0.4f, D) * Smooth(0.25f, 0.5f, T);
+	return SmoothStep(WalkHalf + 0.6f, WalkHalf - 0.4f, D) * SmoothStep(0.25f, 0.5f, T);
 }
 
 FVector2f FStillworldGenerator::RoadDirection(float X, float Y) const
@@ -207,7 +221,7 @@ bool FStillworldGenerator::LotByIndex(int32 I, int32 J, FLot& Out, FVector2f* Ou
 		return false; // too big for a lot
 	}
 	// Even rows face the road at the bottom of the block, odd rows the top.
-	const int32 BlockJ = FMath::FloorToInt(J / 2.f);
+	const int32 BlockJ = FMath::FloorToInt32(J / 2.f);
 	const bool bBottom = (J - BlockJ * 2) == 0;
 	const float Setback = WalkHalf + 1.5f + Half.Y;
 	FVector2f G;
@@ -230,16 +244,16 @@ bool FStillworldGenerator::LotByIndex(int32 I, int32 J, FLot& Out, FVector2f* Ou
 bool FStillworldGenerator::LotAt(float X, float Y, FLot& Out) const
 {
 	const FVector2f G = ToGrid(FVector2f(X, Y));
-	const int32 I = FMath::FloorToInt(G.X / LotWidth);
-	const int32 J = FMath::FloorToInt(G.Y / (BlockV * 0.5f));
+	const int32 I = FMath::FloorToInt32(G.X / LotWidth);
+	const int32 J = FMath::FloorToInt32(G.Y / (BlockV * 0.5f));
 	return LotByIndex(I, J, Out);
 }
 
 bool FStillworldGenerator::InsideBuilding(float X, float Y, float Margin) const
 {
 	const FVector2f G = ToGrid(FVector2f(X, Y));
-	const int32 I = FMath::FloorToInt(G.X / LotWidth);
-	const int32 J = FMath::FloorToInt(G.Y / (BlockV * 0.5f));
+	const int32 I = FMath::FloorToInt32(G.X / LotWidth);
+	const int32 J = FMath::FloorToInt32(G.Y / (BlockV * 0.5f));
 	FLot Lot;
 	FVector2f C, Half;
 	if (!LotByIndex(I, J, Lot, &C, &Half))
@@ -263,10 +277,10 @@ void FStillworldGenerator::LotsInRect(const FVector2f& Min, const FVector2f& Max
 		GMin = FVector2f(FMath::Min(GMin.X, G.X), FMath::Min(GMin.Y, G.Y));
 		GMax = FVector2f(FMath::Max(GMax.X, G.X), FMath::Max(GMax.Y, G.Y));
 	}
-	const int32 I0 = FMath::FloorToInt(GMin.X / LotWidth) - 1;
-	const int32 I1 = FMath::FloorToInt(GMax.X / LotWidth) + 1;
-	const int32 J0 = FMath::FloorToInt(GMin.Y / (BlockV * 0.5f)) - 1;
-	const int32 J1 = FMath::FloorToInt(GMax.Y / (BlockV * 0.5f)) + 1;
+	const int32 I0 = FMath::FloorToInt32(GMin.X / LotWidth) - 1;
+	const int32 I1 = FMath::FloorToInt32(GMax.X / LotWidth) + 1;
+	const int32 J0 = FMath::FloorToInt32(GMin.Y / (BlockV * 0.5f)) - 1;
+	const int32 J1 = FMath::FloorToInt32(GMax.Y / (BlockV * 0.5f)) + 1;
 	for (int32 J = J0; J <= J1; ++J)
 	{
 		for (int32 I = I0; I <= I1; ++I)
@@ -290,21 +304,22 @@ FVector4f FStillworldGenerator::Surface(float X, float Y) const
 	const FVector2f P(X, Y);
 	const FVector3f N = Normal(X, Y, 1.5f);
 	const float Slope = 1.f - N.Z;
-	const float DirtPatch = Smooth(0.25f, 0.5f, Fbm(P / 70.f, 3, 12) + Fbm(P / 9.f, 2, 13) * 0.25f);
+	const float DirtPatch = SmoothStep(0.25f, 0.5f, Fbm(P / 70.f, 3, 12) + Fbm(P / 9.f, 2, 13) * 0.25f);
+	const float Path = Track(X, Y);
 	if (World == EStillworldWorld::Meadow)
 	{
-		const float Dirt = FMath::Clamp(DirtPatch * 0.6f + Smooth(0.25f, 0.5f, Slope), 0.f, 1.f);
-		const float Moss = Smooth(0.2f, 0.6f, Fbm(P / 30.f, 2, 14)) * 0.3f;
+		const float Dirt = FMath::Clamp(DirtPatch * 0.6f + SmoothStep(0.25f, 0.5f, Slope) + Path * 0.85f, 0.f, 1.f);
+		const float Moss = SmoothStep(0.2f, 0.6f, Fbm(P / 30.f, 2, 14)) * 0.3f * (1.f - Path);
 		return FVector4f(1.f - Dirt, Dirt, 0.f, Moss);
 	}
 	const float Asphalt = Road(X, Y);
 	const float Town01 = Town(X, Y);
 	// Rubble/dirt around town, forest floor outside.
-	const float Dirt = FMath::Clamp(DirtPatch * (0.5f + Town01 * 0.4f) + Smooth(0.25f, 0.5f, Slope), 0.f, 1.f) * (1.f - Asphalt);
+	const float Dirt = FMath::Clamp(DirtPatch * (0.5f + Town01 * 0.4f) + SmoothStep(0.25f, 0.5f, Slope) + Path * 0.85f, 0.f, 1.f) * (1.f - Asphalt);
 	const float Grass = FMath::Max(0.f, 1.f - Asphalt - Dirt);
 	// Nature reclaims everything: moss in asphalt cracks and on the ground.
-	const float Moss = FMath::Clamp(Smooth(0.1f, 0.55f, Fbm(P / 18.f, 3, 15)) * (0.35f + 0.4f * (1.f - Town01))
-		+ Asphalt * Smooth(0.35f, 0.7f, Fbm(P / 4.f, 2, 1)) * 0.6f, 0.f, 1.f);
+	const float Moss = FMath::Clamp(SmoothStep(0.1f, 0.55f, Fbm(P / 18.f, 3, 15)) * (0.35f + 0.4f * (1.f - Town01))
+		+ Asphalt * SmoothStep(0.35f, 0.7f, Fbm(P / 4.f, 2, 1)) * 0.6f, 0.f, 1.f);
 	return FVector4f(Grass, Dirt, Asphalt, Moss);
 }
 
@@ -316,30 +331,46 @@ FVector2f FStillworldGenerator::FindSpawn(float& OutYaw) const
 	OutYaw = 0.f;
 	const float Step = 96.f;
 	float Angle = 0.f, Radius = 0.f;
+	// Always return the best candidate seen, never a point inside a building.
+	float BestScore = -1.f;
+	FVector2f Best = FVector2f::ZeroVector;
+	float BestYaw = 0.f;
 	for (int32 I = 0; I < 6000; ++I)
 	{
 		const FVector2f P(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius);
 		const FVector3f N = Normal(P.X, P.Y, 4.f);
-		bool bGood = N.Z > 0.985f;
+		float Score = -1.f;
+		float Yaw = 0.f;
 		if (World == EStillworldWorld::Reclaimed)
 		{
-			// Start in the middle of a street, inside a town.
-			bGood = bGood && Town(P.X, P.Y) > 0.8f && Road(P.X, P.Y) > 0.95f && !InsideBuilding(P.X, P.Y, 2.f);
-			if (bGood)
+			// Ideal: the middle of a street, deep inside a town.
+			if (!InsideBuilding(P.X, P.Y, 2.f))
 			{
+				Score = N.Z * Town(P.X, P.Y) * (0.2f + Road(P.X, P.Y));
 				const FVector2f D = RoadDirection(P.X, P.Y);
-				OutYaw = FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X));
-				return P;
+				Yaw = FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X));
 			}
 		}
-		else if (bGood)
+		else
 		{
-			// Look downhill: usually the most open view over the meadow.
-			OutYaw = FMath::RadiansToDegrees(FMath::Atan2(N.Y, N.X));
-			return P;
+			// Flat ground, looking downhill: the most open view over the meadow.
+			Score = N.Z;
+			Yaw = FMath::RadiansToDegrees(FMath::Atan2(N.Y, N.X));
+		}
+		if (Score > BestScore)
+		{
+			BestScore = Score;
+			Best = P;
+			BestYaw = Yaw;
+		}
+		const bool bIdeal = World == EStillworldWorld::Reclaimed ? Score > 0.9f : Score > 0.985f;
+		if (bIdeal)
+		{
+			break;
 		}
 		Angle += Step / FMath::Max(Radius, Step);
 		Radius = Step * Angle / UE_TWO_PI * 1.5f;
 	}
-	return FVector2f::ZeroVector;
+	OutYaw = BestYaw;
+	return Best;
 }

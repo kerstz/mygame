@@ -36,6 +36,9 @@ public:
 	/** Surface weights: R grass, G dirt/mud, B asphalt/concrete, A moss/overgrowth. */
 	FVector4f Surface(float X, float Y) const;
 
+	/** 0..1 worn dirt track (meadow paths, forest trails outside towns). */
+	float Track(float X, float Y) const;
+
 	/** 0..1 town presence (Reclaimed only). */
 	float Town(float X, float Y) const;
 	/** 0..1 asphalt amount (roads + sidewalks), Reclaimed only. */

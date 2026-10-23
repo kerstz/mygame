@@ -117,7 +117,9 @@ void FStillworldSettings::ApplyPreset(EStillworldPreset InPreset)
 	case EStillworldPreset::High:
 		SetGroups(3);
 		ScreenPercentage = 72.f;
-		RayTracing = EStillworldRayTracing::Off;
+		// Hardware Lumen without hit lighting: full GI on the procedural
+		// terrain (which has no distance field) at moderate cost.
+		RayTracing = V.HasHardwareRayTracing() ? EStillworldRayTracing::Lumen : EStillworldRayTracing::Off;
 		FoliageDensity = 0.85f;
 		FoliageDistance = 1.f;
 		bFrameGeneration = false;

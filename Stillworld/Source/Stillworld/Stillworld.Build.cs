@@ -9,11 +9,12 @@ public class Stillworld : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
+			"DeveloperSettings", "GeometryCore", "GeometryFramework",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"Slate", "SlateCore", "RHI", "DeveloperSettings", "GeometryCore", "GeometryFramework",
+			"Slate", "SlateCore", "RHI",
 		});
 	}
 }

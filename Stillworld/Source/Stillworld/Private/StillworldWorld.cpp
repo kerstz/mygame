@@ -14,6 +14,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Math/RandomStream.h"
 #include "StillworldGameMode.h"
+#include "StillworldMath.h"
 #include "StillworldSettings.h"
 #include "StillworldWeather.h"
 
@@ -22,17 +23,12 @@ using UE::Geometry::FIndex3i;
 
 namespace
 {
-	constexpr float M = 100.f; // metres -> centimetres
+	using StillworldMath::M;
+	using StillworldMath::SmoothStep;
 
-	int32 Cheb(const FIntPoint& A, const FIntPoint& B)
+	int32 ChunkCheb(const FIntPoint& A, const FIntPoint& B)
 	{
 		return FMath::Max(FMath::Abs(A.X - B.X), FMath::Abs(A.Y - B.Y));
-	}
-
-	float Smooth(float E0, float E1, float X)
-	{
-		const float T = FMath::Clamp((X - E0) / (E1 - E0), 0.f, 1.f);
-		return T * T * (3.f - 2.f * T);
 	}
 
 	/** Whether FDynamicMesh3 considers (0,0,0),(1,0,0),(0,1,0) as facing +Z.
@@ -261,7 +257,7 @@ void AStillworldWorld::Tick(float DeltaSeconds)
 			Focus = Cam->GetCameraLocation();
 		}
 	}
-	const FIntPoint C(FMath::FloorToInt(Focus.X / (ChunkMeters * M)), FMath::FloorToInt(Focus.Y / (ChunkMeters * M)));
+	const FIntPoint C(FMath::FloorToInt32(Focus.X / (ChunkMeters * M)), FMath::FloorToInt32(Focus.Y / (ChunkMeters * M)));
 	if (C != Center)
 	{
 		Center = C;
@@ -269,7 +265,7 @@ void AStillworldWorld::Tick(float DeltaSeconds)
 		TArray<FIntPoint> Remove;
 		for (TPair<FIntPoint, FChunk>& Pair : Chunks)
 		{
-			if (Cheb(Pair.Key, Center) > ViewChunks + 1)
+			if (ChunkCheb(Pair.Key, Center) > ViewChunks + 1)
 			{
 				DestroyChunk(Pair.Value);
 				Remove.Add(Pair.Key);
@@ -350,8 +346,8 @@ void AStillworldWorld::Upload()
 		}
 		TSharedPtr<FChunkBuild> Build = Pending[I].Task.GetResult();
 		Pending.RemoveAtSwap(I);
-		const int32 Wanted = LodFor(Cheb(Build->Coord, Center));
-		if (Cheb(Build->Coord, Center) > ViewChunks + 1 || Build->Lod != Wanted || Build->Generation != Generation)
+		const int32 Wanted = LodFor(ChunkCheb(Build->Coord, Center));
+		if (ChunkCheb(Build->Coord, Center) > ViewChunks + 1 || Build->Lod != Wanted || Build->Generation != Generation)
 		{
 			continue; // stale: the player moved or settings changed
 		}
@@ -394,6 +390,12 @@ void AStillworldWorld::ApplyChunk(FChunkBuild& Build)
 	Terrain->SetWorldLocation(FVector(Build.Coord.X * ChunkMeters * M, Build.Coord.Y * ChunkMeters * M, 0.0));
 	Terrain->SetMesh(MoveTemp(Build.Mesh));
 	Terrain->SetTangentsType(EDynamicMeshComponentTangentsMode::AutoCalculated);
+	// Vertex colours are surface weights, not colours: no sRGB conversion.
+	Terrain->SetVertexColorSpaceTransformMode(EDynamicMeshVertexColorTransformMode::None);
+	// Runtime meshes have no distance field / mesh cards, so software Lumen
+	// only sees the terrain through screen traces; hardware Lumen (ray
+	// tracing) lights it fully. Presets High/Ultra enable it when supported.
+	Terrain->SetVisibleInRayTracing(true);
 	if (TerrainMaterial)
 	{
 		Terrain->SetMaterial(0, TerrainMaterial);
@@ -452,7 +454,7 @@ void AStillworldWorld::UpdateCollision()
 	for (TPair<FIntPoint, FChunk>& Pair : Chunks)
 	{
 		FChunk& Ch = Pair.Value;
-		const bool bWant = Cheb(Pair.Key, Center) <= 1;
+		const bool bWant = ChunkCheb(Pair.Key, Center) <= 1;
 		if (bWant != Ch.bCollision && Ch.Terrain)
 		{
 			Ch.bCollision = bWant;
@@ -478,8 +480,8 @@ void AStillworldWorld::PlacePlayer()
 		return;
 	}
 	const float GroundZ = Generator.Height(SpawnPoint.X, SpawnPoint.Y) * M;
-	const FVector Spawn(SpawnPoint.X * M, SpawnPoint.Y * M, GroundZ + 100.f);
-	const FIntPoint C(FMath::FloorToInt(SpawnPoint.X / ChunkMeters), FMath::FloorToInt(SpawnPoint.Y / ChunkMeters));
+	const FVector Spawn(SpawnPoint.X * M, SpawnPoint.Y * M, GroundZ + Pawn->GetSimpleCollisionHalfHeight() + 25.f);
+	const FIntPoint C(FMath::FloorToInt32(SpawnPoint.X / ChunkMeters), FMath::FloorToInt32(SpawnPoint.Y / ChunkMeters));
 	const FChunk* Ch = Chunks.Find(C);
 	if (!Ch || !Ch->bCollision)
 	{
@@ -684,7 +686,7 @@ void AStillworldWorld::BuildScatter(const FBuildParams& P, FChunkBuild& Out)
 			float Prob = 1.f;
 			if (L.Clumping > 0.f)
 			{
-				Prob *= FMath::Lerp(1.f, Smooth(0.35f, 0.7f, Gen.Patch(Pos.X, Pos.Y, L.ClumpSize, LI)), L.Clumping);
+				Prob *= FMath::Lerp(1.f, SmoothStep(0.35f, 0.7f, Gen.Patch(Pos.X, Pos.Y, L.ClumpSize, LI)), L.Clumping);
 			}
 			const float RoadW = Gen.Road(Pos.X, Pos.Y);
 			switch (L.Placement)
