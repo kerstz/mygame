@@ -1,9 +1,20 @@
 # STILLWORLD — Cahier des charges (version consolidée)
 
-> Réécriture propre du brief d'origine (vision + plan + contraintes). Les notes
-> UE5 (Nanite, Lumen, Unreal Insights…) du brief d'origine ne s'appliquent pas :
-> le moteur retenu est **Godot 4.x**. On en garde les principes (budget de frame,
-> instancing, LOD, profilage CPU/GPU séparé, upscaling FSR).
+> Réécriture propre du brief d'origine (vision + plan + contraintes).
+>
+> **Mise à jour (décisions de l'utilisateur, dans l'ordre) :** moteur **Unreal
+> Engine 5** (photoréalisme « bluffant », Lumen/Nanite) au lieu de Godot — le
+> prototype Godot est conservé dans `prototype-godot/` ; référence visuelle =
+> prairie grise et brumeuse ; menu magnifique et simple mais réglages
+> graphiques complets ; **Ultra réellement ultra** (30-60 i/s acceptés) avec
+> **ray tracing** et **génération d'images** AMD (FSR) et NVIDIA (DLSS) ;
+> passage par **Proton** accepté ; second monde **inspiré de The Last of Us**
+> (ville abandonnée reprise par la nature) ; **chaque carte générée
+> aléatoirement**, **tous les mondes procéduraux** ; **sons réalistes et
+> variés** (pas selon la surface, ambiances), toujours sans musique.
+>
+> Les sections ci-dessous gardent la vision d'origine ; quand elles parlent de
+> Godot, lire « Unreal Engine 5 ».
 
 ## 1. Objectif
 Jeu d'exploration à la première personne, contemplatif, dans une nature
